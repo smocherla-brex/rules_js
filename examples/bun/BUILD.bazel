@@ -1,0 +1,47 @@
+"""
+Bun TypeScript example
+
+Simple example showing how to run TypeScript with Bun runtime using the --//js:js_runtime flag.
+"""
+
+load("@aspect_bazel_lib//lib:diff_test.bzl", "diff_test")
+load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_run_binary", "js_test")
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+
+# Simple Bun TypeScript binary
+js_binary(
+    name = "main",
+    entry_point = "main.ts",
+)
+
+# Run the binary and capture output
+js_run_binary(
+    name = "run_main",
+    outs = ["output.json"],
+    args = ["output.json"],
+    tool = ":main",
+)
+
+# Expected output for testing
+write_file(
+    name = "expected_output",
+    out = "expected.json",
+    content = ["""{
+  "greeting": "Hello, Bun Developer! You are 25 years old.",
+  "bunVersion": "1.2.20",
+  "platform": "darwin"
+}"""],
+)
+
+# Test that verifies the output structure (flexible for different platforms)
+js_test(
+    name = "main_test",
+    data = [":output.json"],
+    entry_point = "test.js",
+)
+
+# Simple test that checks the binary runs successfully
+js_test(
+    name = "bun_runtime_test",
+    entry_point = "main.ts",
+)

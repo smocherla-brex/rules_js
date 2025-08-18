@@ -103,6 +103,32 @@ node_dev.toolchain(
     node_version = "20.11.1",
 )
 
+# bun toolchain registration
+bun_dev = use_extension(
+    "//js/bun:extensions.bzl",
+    "bun",
+    dev_dependency = True,
+)
+
+inject_repo(bun_dev, "aspect_rules_js")
+
+bun_dev.toolchain()
+use_repo(bun_dev, "bun_linux_x86_64_glibc")
+use_repo(bun_dev, "bun_linux_arm64_glibc")
+use_repo(bun_dev, "bun_osx_arm64")
+use_repo(bun_dev, "bun_osx_x86_64")
+use_repo(bun_dev, "bun_windows_x86_64")
+
+register_toolchains("@bun_osx_arm64//:toolchain")
+
+register_toolchains("@bun_osx_x86_64//:toolchain")
+
+register_toolchains("@bun_linux_arm64_glibc//:toolchain")
+
+register_toolchains("@bun_linux_x86_64_glibc//:toolchain")
+
+register_toolchains("@bun_windows_x86_64//:toolchain")
+
 ############################################
 # npm dependencies used by examples
 

@@ -2,9 +2,20 @@
 
 load("@aspect_bazel_lib//lib:utils.bzl", bazel_lib_utils = "utils")
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 
 exports_files(
     glob(["*.bzl"]),
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "js_runtime",
+    build_setting_default = "node",
+    values = [
+        "node",
+        "bun",
+    ],
     visibility = ["//visibility:public"],
 )
 

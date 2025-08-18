@@ -19,6 +19,7 @@ load("@aspect_bazel_lib//lib:copy_to_bin.bzl", "COPY_FILE_TO_BIN_TOOLCHAINS")
 load("@aspect_bazel_lib//lib:directory_path.bzl", "DirectoryPathInfo")
 load("@aspect_bazel_lib//lib:expand_make_vars.bzl", "expand_locations", "expand_variables")
 load("@aspect_bazel_lib//lib:windows_utils.bzl", "create_windows_native_launcher_script")
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load(":bash.bzl", "BASH_INITIALIZE_RUNFILES")
 load(":js_helpers.bzl", "LOG_LEVELS", "envs_for_log_level", "gather_runfiles")
 
@@ -325,6 +326,9 @@ _ATTRS = {
         allow_single_file = True,
         default = Label("@aspect_rules_js//js/private/node-patches:register.cjs"),
     ),
+    "_js_runtime": attr.label(
+        default = Label("@aspect_rules_js//js:js_runtime"),
+    ),
 }
 
 _ENV_SET = """export {var}=\"{value}\""""
@@ -344,7 +348,7 @@ def _expand_env_if_needed(ctx, value):
         return " ".join([expand_variables(ctx, exp, attribute_name = "env") for exp in expand_locations(ctx, value, ctx.attr.data).split(" ")])
     return value
 
-def _bash_launcher(ctx, nodeinfo, entry_point_path, log_prefix_rule_set, log_prefix_rule, fixed_args, fixed_env, is_windows):
+def _bash_launcher(ctx, js_runtime_is_node, nodeinfo, buninfo, entry_point_path, log_prefix_rule_set, log_prefix_rule, fixed_args, fixed_env, is_windows):
     # Explicitly disable node fs patches on Windows:
     # https://github.com/aspect-build/rules_js/issues/1137
     if is_windows:
@@ -381,6 +385,7 @@ def _bash_launcher(ctx, nodeinfo, entry_point_path, log_prefix_rule_set, log_pre
             ctx.label.name,
         ),
         "JS_BINARY__WORKSPACE": ctx.workspace_name,
+        "JS_BINARY__JS_RUNTIME": "node" if js_runtime_is_node else "bun",
     }
     if is_windows and not ctx.attr.enable_runfiles:
         builtins["JS_BINARY__NO_RUNFILES"] = "1"
@@ -438,7 +443,7 @@ def _bash_launcher(ctx, nodeinfo, entry_point_path, log_prefix_rule_set, log_pre
     toolchain_files.append(node_wrapper)
 
     npm_path = ""
-    if ctx.attr.include_npm:
+    if js_runtime_is_node and ctx.attr.include_npm:
         if hasattr(nodeinfo, "npm"):
             npm_path = nodeinfo.npm.short_path if nodeinfo.npm else nodeinfo.npm_path
         else:
@@ -462,11 +467,13 @@ def _bash_launcher(ctx, nodeinfo, entry_point_path, log_prefix_rule_set, log_pre
             )
         toolchain_files.append(npm_wrapper)
 
-    if hasattr(nodeinfo, "node"):
+    if js_runtime_is_node and hasattr(nodeinfo, "node"):
         node_path = nodeinfo.node.short_path if nodeinfo.node else nodeinfo.node_path
-    else:
+    elif js_runtime_is_node:
         # TODO(3.0): drop support for deprecated toolchain attributes
         node_path = _deprecated_target_tool_path_to_short_path(nodeinfo.target_tool_path)
+    else:
+        node_path = buninfo.bun.short_path
 
     launcher_subst = {
         "{{target_label}}": str(ctx.label),
@@ -479,11 +486,11 @@ def _bash_launcher(ctx, nodeinfo, entry_point_path, log_prefix_rule_set, log_pre
         "{{log_prefix_rule_set}}": log_prefix_rule_set,
         "{{log_prefix_rule}}": log_prefix_rule,
         "{{node_options}}": "\n".join(node_options),
-        "{{node_patches}}": ctx.file._node_patches.short_path,
-        "{{node_wrapper}}": node_wrapper.short_path,
+        "{{node_wrapper}}": node_wrapper.short_path if js_runtime_is_node else node_path,
         "{{node}}": node_path,
         "{{npm}}": npm_path,
         "{{workspace_name}}": ctx.workspace_name,
+        "{{node_patches}}": ctx.file._node_patches.short_path,
     }
 
     # The '_' avoids collisions with another file matching the label name.
@@ -501,11 +508,17 @@ def _bash_launcher(ctx, nodeinfo, entry_point_path, log_prefix_rule_set, log_pre
 
 def _create_launcher(ctx, log_prefix_rule_set, log_prefix_rule, fixed_args = [], fixed_env = {}):
     is_windows = ctx.target_platform_has_constraint(ctx.attr._windows_constraint[platform_common.ConstraintValueInfo])
+    js_runtime = ctx.attr._js_runtime[BuildSettingInfo].value
 
+    nodeinfo = None
+    buninfo = None
+    js_runtime_is_node = js_runtime == "node"
     if ctx.attr.node_toolchain:
         nodeinfo = ctx.attr.node_toolchain[platform_common.ToolchainInfo].nodeinfo
     else:
         nodeinfo = ctx.toolchains["@rules_nodejs//nodejs:toolchain_type"].nodeinfo
+
+    buninfo = ctx.toolchains["//js/bun:toolchain_type"].buninfo
 
     if DirectoryPathInfo in ctx.attr.entry_point:
         entry_point = ctx.attr.entry_point[DirectoryPathInfo].directory
@@ -519,21 +532,26 @@ def _create_launcher(ctx, log_prefix_rule_set, log_prefix_rule, fixed_args = [],
         entry_point = ctx.files.entry_point[0]
         entry_point_path = entry_point.short_path
 
-    bash_launcher, toolchain_files = _bash_launcher(ctx, nodeinfo, entry_point_path, log_prefix_rule_set, log_prefix_rule, fixed_args, fixed_env, is_windows)
+    bash_launcher, toolchain_files = _bash_launcher(ctx, js_runtime_is_node, nodeinfo, buninfo, entry_point_path, log_prefix_rule_set, log_prefix_rule, fixed_args, fixed_env, is_windows)
     launcher = create_windows_native_launcher_script(ctx, bash_launcher) if is_windows else bash_launcher
 
     launcher_files = [bash_launcher]
     launcher_files.extend(toolchain_files)
-    if hasattr(nodeinfo, "node"):
+    if js_runtime_is_node and hasattr(nodeinfo, "node"):
         if nodeinfo.node:
             launcher_files.append(nodeinfo.node)
-    else:
+    elif js_runtime_is_node:
         # TODO(3.0): drop support for deprecated toolchain attributes
         launcher_files.extend(nodeinfo.tool_files)
 
-    launcher_files.extend(ctx.files._node_patches_files + [ctx.file._node_patches])
+    if not js_runtime_is_node:
+        launcher_files.append(buninfo.bun)
+
+    if js_runtime_is_node:
+        launcher_files.extend(ctx.files._node_patches_files + [ctx.file._node_patches])
+
     transitive_launcher_files = None
-    if ctx.attr.include_npm:
+    if js_runtime_is_node and ctx.attr.include_npm:
         if hasattr(nodeinfo, "npm_sources"):
             transitive_launcher_files = nodeinfo.npm_sources
         else:
@@ -626,6 +644,7 @@ js_binary_lib = struct(
         # TODO: on Windows this toolchain is never referenced
         "@bazel_tools//tools/sh:toolchain_type",
         "@rules_nodejs//nodejs:toolchain_type",
+        "//js/bun:toolchain_type",
     ] + COPY_FILE_TO_BIN_TOOLCHAINS,
 )
 

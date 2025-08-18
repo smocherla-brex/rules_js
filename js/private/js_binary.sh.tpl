@@ -321,9 +321,12 @@ if [ "${JS_BINARY__NO_RUNFILES:-}" ]; then
 else
     export JS_BINARY__NODE_PATCHES="$JS_BINARY__RUNFILES/{{workspace_name}}/{{node_patches}}"
 fi
-if [ ! -f "$JS_BINARY__NODE_PATCHES" ]; then
-    logf_fatal "node patches '%s' not found" "$JS_BINARY__NODE_PATCHES"
-    exit 1
+
+if [ "$JS_BINARY__JS_RUNTIME" == "node" ]; then
+  if [ ! -f "$JS_BINARY__NODE_PATCHES" ]; then
+      logf_fatal "node patches '%s' not found" "$JS_BINARY__NODE_PATCHES"
+      exit 1
+  fi
 fi
 
 # Change directory to user specified package if set
