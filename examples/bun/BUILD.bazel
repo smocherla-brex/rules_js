@@ -8,17 +8,17 @@ load("@aspect_bazel_lib//lib:diff_test.bzl", "diff_test")
 load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_run_binary", "js_test")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 
-# Simple Bun TypeScript binary
+# Simple Bun js_binary
 js_binary(
     name = "main",
-    entry_point = "main.ts",
+    entry_point = "main.js",
 )
 
-# Run the binary and capture output
+# Run the binary as tool and capture output
 js_run_binary(
     name = "run_main",
     outs = ["output.json"],
-    args = ["output.json"],
+    args = ["$(location output.json)"],
     tool = ":main",
 )
 
@@ -43,5 +43,5 @@ js_test(
 # Simple test that checks the binary runs successfully
 js_test(
     name = "bun_runtime_test",
-    entry_point = "main.ts",
+    entry_point = "main.js",
 )

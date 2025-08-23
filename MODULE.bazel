@@ -146,6 +146,7 @@ npm.npm_translate_lock(
             "tsserver=./bin/tsserver",
         ],
     },
+    # Use bun over node
     bun_toolchain_prefix = "bun",
     custom_postinstalls = {
         "@aspect-test/c": "echo moo > cow.txt",
