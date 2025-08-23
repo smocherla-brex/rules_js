@@ -429,7 +429,9 @@ def _bash_launcher(ctx, js_runtime_is_node, nodeinfo, buninfo, entry_point_path,
         ctx.actions.expand_template(
             template = ctx.file._node_wrapper_bat,
             output = node_wrapper,
-            substitutions = {},
+            substitutions = {
+                "%%JS_RUNTIME%%": "node" if js_runtime_is_node else "bun",
+            },
             is_executable = True,
         )
     else:
@@ -437,7 +439,9 @@ def _bash_launcher(ctx, js_runtime_is_node, nodeinfo, buninfo, entry_point_path,
         ctx.actions.expand_template(
             template = ctx.file._node_wrapper_sh,
             output = node_wrapper,
-            substitutions = {},
+            substitutions = {
+                "%%JS_RUNTIME%%": "node" if js_runtime_is_node else "bun",
+            },
             is_executable = True,
         )
     toolchain_files.append(node_wrapper)
@@ -486,7 +490,7 @@ def _bash_launcher(ctx, js_runtime_is_node, nodeinfo, buninfo, entry_point_path,
         "{{log_prefix_rule_set}}": log_prefix_rule_set,
         "{{log_prefix_rule}}": log_prefix_rule,
         "{{node_options}}": "\n".join(node_options),
-        "{{node_wrapper}}": node_wrapper.short_path if js_runtime_is_node else node_path,
+        "{{node_wrapper}}": node_wrapper.short_path,
         "{{node}}": node_path,
         "{{npm}}": npm_path,
         "{{workspace_name}}": ctx.workspace_name,
@@ -518,7 +522,14 @@ def _create_launcher(ctx, log_prefix_rule_set, log_prefix_rule, fixed_args = [],
     else:
         nodeinfo = ctx.toolchains["@rules_nodejs//nodejs:toolchain_type"].nodeinfo
 
-    buninfo = ctx.toolchains["//js/bun:toolchain_type"].buninfo
+    bun_toolchain = ctx.toolchains["//js/bun:toolchain_type"]
+
+    if not js_runtime_is_node and not bun_toolchain:
+        fail("bun runtime was selected with //js:js_runtime but no bun toolchain was registered. Please add a call to register_toolchains to register the bun toolchain")
+
+    # bun toolchain is optional
+    if bun_toolchain:
+        buninfo = bun_toolchain.buninfo
 
     if DirectoryPathInfo in ctx.attr.entry_point:
         entry_point = ctx.attr.entry_point[DirectoryPathInfo].directory
@@ -644,7 +655,7 @@ js_binary_lib = struct(
         # TODO: on Windows this toolchain is never referenced
         "@bazel_tools//tools/sh:toolchain_type",
         "@rules_nodejs//nodejs:toolchain_type",
-        "//js/bun:toolchain_type",
+        config_common.toolchain_type("//js/bun:toolchain_type", mandatory = False),
     ] + COPY_FILE_TO_BIN_TOOLCHAINS,
 )
 

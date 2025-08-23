@@ -7,12 +7,12 @@ BunInfo = provider(fields = {
 })
 
 _BUN_PLATFORMS = {
-    ("osx", "arm64", None): {
+    ("darwin", "arm64", None): {
         "filename": "bun-darwin-aarch64.zip",
         "strip_prefix": "bun-darwin-aarch64",
         "sha256": "404f5a6dd1f604b40eb3b156d4197bb8d398bb26e0ae4c8ac8e7aa490f7e235f",
     },
-    ("osx", "x86_64", None): {
+    ("darwin", "x86_64", None): {
         "filename": "bun-darwin-x64.zip",
         "strip_prefix": "bun-darwin-x64",
         "sha256": "e1cc2f4b8e4d4172dde107982db42a22f8c5c8d8bb26078c23285704a4b72cd6",
@@ -52,6 +52,8 @@ def register_bun_toolchains(base_name):
 load("@bazel_skylib//rules:native_binary.bzl", "native_binary")
 load("@aspect_rules_js//js/bun:defs.bzl", "bun_toolchain")
 
+exports_files(["bun"])
+
 native_binary(
     name = "bun_bin",
     src = "bun.exe" if "{os}" == "windows" else "bun",
@@ -69,7 +71,7 @@ toolchain(
     name = "toolchain",
     toolchain = ":bun_toolchain_{os}_{cpu}",
     exec_compatible_with = [
-        "@platforms//os:{os}",
+        "@platforms//os:macos" if "{os}" == "darwin" else "@platforms//os:{os}",
         "@platforms//cpu:{cpu}",
     ],
     toolchain_type = "@aspect_rules_js//js/bun:toolchain_type",

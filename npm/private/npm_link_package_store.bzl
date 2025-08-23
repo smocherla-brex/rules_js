@@ -57,6 +57,7 @@ If set, takes precendance over the package name in the src npm_package_store.
 _BIN_TMPL = """#!/bin/sh
 basedir=$(dirname "$(echo "$0" | sed -e 's,\\\\,/,g')")
 exec node "$basedir/{bin_path}" "$@"
+fi
 """
 
 def _npm_link_package_store_impl(ctx):

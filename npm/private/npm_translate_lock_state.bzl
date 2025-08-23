@@ -120,15 +120,19 @@ def _init_common_labels(priv, rctx, attr, label_store, is_windows):
 
 ################################################################################
 def _init_pnpm_labels(priv, rctx, attr, label_store):
-    # Note that we must reference the node binary under the platform-specific node
-    # toolchain repository rather than under @nodejs_host since running rctx.path
-    # (called outside this function) on the alias in the host repo fails under bzlmod.
-    # It appears to fail because the platform-specific repository does not exist
-    # unless we reference the label here.
-    #
-    # TODO: Try to understand this better and see if we can go back to using
-    #  Label("@nodejs_host//:bin/node")
-    label_store.add("host_node", Label("@{}_{}//:bin/node".format(attr.node_toolchain_prefix, repo_utils.platform(rctx))))
+    if attr.bun_toolchain_prefix:
+        # if bun toolchain is provided, prefer that first and fallback to node
+        label_store.add("host_node", Label("@{}_{}//:bun".format(attr.bun_toolchain_prefix, repo_utils.platform(rctx))))
+    else:
+        # Note that we must reference the node binary under the platform-specific node
+        # toolchain repository rather than under @nodejs_host since running rctx.path
+        # (called outside this function) on the alias in the host repo fails under bzlmod.
+        # It appears to fail because the platform-specific repository does not exist
+        # unless we reference the label here.
+        #
+        # TODO: Try to understand this better and see if we can go back to using
+        #  Label("@nodejs_host//:bin/node")
+        label_store.add("host_node", Label("@{}_{}//:bin/node".format(attr.node_toolchain_prefix, repo_utils.platform(rctx))))
 
     label_store.add("pnpm_entry", attr.use_pnpm if priv["bzlmod"] and attr.use_pnpm else Label("@pnpm//:package/bin/pnpm.cjs"))
 

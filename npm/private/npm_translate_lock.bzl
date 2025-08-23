@@ -87,6 +87,7 @@ _ATTRS = {
     "link_workspace": attr.string(),
     "no_optional": attr.bool(),
     "node_toolchain_prefix": attr.string(default = "nodejs"),
+    "bun_toolchain_prefix": attr.string(),
     "npm_package_lock": attr.label(),
     "npm_package_target_name": attr.string(),
     "npmrc": attr.label(),
@@ -186,6 +187,7 @@ def npm_translate_lock(
         yarn_lock = None,
         update_pnpm_lock = False,
         node_toolchain_prefix = "nodejs",
+        bun_toolchain_prefix = None,
         yq_toolchain_prefix = "yq",
         preupdate = [],
         npmrc = None,
@@ -261,6 +263,8 @@ def npm_translate_lock(
             Read more: [using update_pnpm_lock](/docs/pnpm.md#update_pnpm_lock)
 
         node_toolchain_prefix: the prefix of the node toolchain to use when generating the pnpm lockfile.
+
+        bun_toolchain_prefix: the prefix of the bun toolchain to use when generating the pnpm lockfile. Eithe the node or bun toolchain be used but not both.
 
         yq_toolchain_prefix: the prefix of the yq toolchain to use for parsing the pnpm lockfile.
 
@@ -565,6 +569,9 @@ def npm_translate_lock(
         # ctx.actions.declare_symlink was added in Bazel 6
         fail("A minimum version of Bazel 6 required to use rules_js")
 
+    if node_toolchain_prefix and bun_toolchain_prefix:
+        fail("Cannot use node_toolchain and bun_toolchain at the same time. If wanting to use bun, set bun_toolchain_prefix and override node_toolchain_prefix to None")
+
     # Gather undocumented attributes
     root_package = kwargs.pop("root_package", None)
     additional_file_contents = kwargs.pop("additional_file_contents", {})
@@ -653,6 +660,7 @@ def npm_translate_lock(
         preupdate = preupdate,
         quiet = quiet,
         node_toolchain_prefix = node_toolchain_prefix,
+        bun_toolchain_prefix = bun_toolchain_prefix,
         use_pnpm = use_pnpm,
         yq_toolchain_prefix = yq_toolchain_prefix,
         npm_package_target_name = npm_package_target_name,

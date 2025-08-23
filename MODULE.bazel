@@ -107,7 +107,6 @@ node_dev.toolchain(
 bun_dev = use_extension(
     "//js/bun:extensions.bzl",
     "bun",
-    dev_dependency = True,
 )
 
 inject_repo(bun_dev, "aspect_rules_js")
@@ -115,13 +114,14 @@ inject_repo(bun_dev, "aspect_rules_js")
 bun_dev.toolchain()
 use_repo(bun_dev, "bun_linux_x86_64_glibc")
 use_repo(bun_dev, "bun_linux_arm64_glibc")
-use_repo(bun_dev, "bun_osx_arm64")
-use_repo(bun_dev, "bun_osx_x86_64")
+use_repo(bun_dev, "bun_darwin_arm64")
+use_repo(bun_dev, "bun_darwin_x86_64")
 use_repo(bun_dev, "bun_windows_x86_64")
 
-register_toolchains("@bun_osx_arm64//:toolchain")
+# Optional bun toolchains
+register_toolchains("@bun_darwin_arm64//:toolchain")
 
-register_toolchains("@bun_osx_x86_64//:toolchain")
+register_toolchains("@bun_darwin_x86_64//:toolchain")
 
 register_toolchains("@bun_linux_arm64_glibc//:toolchain")
 
@@ -146,6 +146,7 @@ npm.npm_translate_lock(
             "tsserver=./bin/tsserver",
         ],
     },
+    bun_toolchain_prefix = "bun",
     custom_postinstalls = {
         "@aspect-test/c": "echo moo > cow.txt",
         "@aspect-test/c@2.0.2": "echo mooo >> cow.txt",
